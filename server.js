@@ -17,12 +17,12 @@ const app = express();
 app.use(
   cors({
     origin: [
-      "http://127.0.0.1:[본인의 포트번호]",
-      "http://localhost:[본인의 포트번호]",
+      "http://127.0.0.1:3001", // 👉 본인 포트번호로 수정!
+      "http://localhost:3001", // 👉 본인 포트번호로 수정!
     ],
     methods: ["OPTIONS", "POST", "GET", "DELETE"],
     credentials: true,
-  })
+  }),
 );
 
 app.use(cookieParser());
@@ -33,26 +33,55 @@ const secretKey = "ozcodingschool";
 // 클라이언트에서 post 요청을 받은 경우
 app.post("/", (req, res) => {
   const { userId, userPassword } = req.body;
+
   const userInfo = users.find(
-    (el) => el.user_id === userId && el.user_password === userPassword
+    (el) => el.user_id === userId && el.user_password === userPassword,
   );
+
   // 유저정보가 없는 경우
   if (!userInfo) {
     res.status(401).send("로그인 실패");
   } else {
-    // 1. 유저정보가 있는 경우 accessToken을 발급하는 로직을 작성하세요.(sign)
-    // 이곳에 코드를 작성하세요.
-    // 2. 응답으로 accessToken을 클라이언트로 전송하세요. (res.send 사용)
-    // 이곳에 코드를 작성하세요.
+    // ✅ 1. 유저정보가 있는 경우 accessToken을 발급하는 로직
+    const accessToken = jwt.sign(
+      {
+        userId: userInfo.user_id,
+        userName: userInfo.user_name,
+        userInfo: userInfo.user_info,
+      },
+      secretKey,
+      { expiresIn: "1h" }, // 토큰 유효기간: 1시간
+    );
+
+    // ✅ 2. 응답으로 accessToken을 클라이언트로 전송
+    res.send({ accessToken });
   }
 });
 
 // 클라이언트에서 get 요청을 받은 경우
 app.get("/", (req, res) => {
-  // 3. req headers에 담겨있는 accessToken을 검증하는 로직을 작성하세요.(verify)
-  // 이곳에 코드를 작성하세요.
-  // 4. 검증이 완료되면 유저정보를 클라이언트로 전송하세요.(res.send 사용)
-  // 이곳에 코드를 작성하세요.
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader) {
+    return res.status(401).send("토큰이 없습니다!");
+  }
+
+  // Bearer <토큰> 형식 처리
+  const token = authHeader.split(" ")[1];
+
+  // ✅ 3. accessToken을 검증하는 로직
+  jwt.verify(token, secretKey, (err, decoded) => {
+    if (err) {
+      return res.status(401).send("토큰이 유효하지 않습니다!");
+    }
+
+    // ✅ 4. 검증이 완료되면 유저정보를 클라이언트로 전송
+    res.send({
+      userId: decoded.userId,
+      userName: decoded.userName,
+      userInfo: decoded.userInfo,
+    });
+  });
 });
 
 app.listen(3000, () => console.log("서버 실행!"));
